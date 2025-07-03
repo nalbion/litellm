@@ -3,8 +3,8 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "The tag version you want to build"
-        required: true
+        description: "The tag version you want to build."
+        default: "latest"
       release_type:
         description: "The release type you want to build. Can be 'latest', 'stable', 'dev', 'rc'"
         type: string
@@ -223,8 +223,8 @@ jobs:
 
       - name: Update Helm chart to use forked images
         run: |
-          chmod +x update-helm-chart.sh
-          ./update-helm-chart.sh ${{ github.repository_owner }}
+          chmod +x .github/workflows/update-helm-chart.sh
+          .github/workflows/update-helm-chart.sh ${{ github.repository_owner }}
 
       - name: Update Chart.yaml description
         run: |
