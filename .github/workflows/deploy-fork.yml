@@ -1,0 +1,275 @@
+name: Deploy LiteLLM Docker Images and Helm Chart to ghcr.io (Fork)
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The tag version you want to build"
+        required: true
+      release_type:
+        description: "The release type you want to build. Can be 'latest', 'stable', 'dev', 'rc'"
+        type: string
+        default: "latest"
+      commit_hash:
+        description: "Commit hash"
+        required: true
+      chart_version:
+        description: "Helm chart version (optional, will auto-increment if not provided)"
+        required: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  CHART_NAME: litellm-helm
+
+jobs:
+  print:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Commit hash: ${{ github.event.inputs.commit_hash }}"
+          echo "Tag: ${{ github.event.inputs.tag }}"
+          echo "Release type: ${{ github.event.inputs.release_type }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Image name: ${{ env.IMAGE_NAME }}"
+
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.commit_hash }}
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.tag }},
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.release_type }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+
+  build-and-push-image-database:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.commit_hash }}
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for database Dockerfile
+        id: meta-database
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-database
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Database Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.database
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-database:${{ github.event.inputs.tag }},
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-database:${{ github.event.inputs.release_type }}
+          labels: ${{ steps.meta-database.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+
+  build-and-push-image-non-root:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.commit_hash }}
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for non_root Dockerfile
+        id: meta-non-root
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-non-root
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push non_root Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.non_root
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-non-root:${{ github.event.inputs.tag }},
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-non-root:${{ github.event.inputs.release_type }}
+          labels: ${{ steps.meta-non-root.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+
+  build-and-push-image-spend-logs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.commit_hash }}
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for spend-logs Dockerfile
+        id: meta-spend-logs
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-spend-logs
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Spend Logs Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./litellm-js/spend-logs/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-spend-logs:${{ github.event.inputs.tag }},
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-spend-logs:${{ github.event.inputs.release_type }}
+          labels: ${{ steps.meta-spend-logs.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+
+  build-and-push-helm-chart:
+    if: github.event.inputs.release_type != 'dev'
+    needs: [build-and-push-image, build-and-push-image-database]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.inputs.commit_hash }}
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: lowercase github.repository_owner
+        run: |
+          echo "REPO_OWNER=`echo ${{github.repository_owner}} | tr '[:upper:]' '[:lower:]'`" >>${GITHUB_ENV}
+
+      - name: Update Helm chart to use forked images
+        run: |
+          chmod +x update-helm-chart.sh
+          ./update-helm-chart.sh ${{ github.repository_owner }}
+
+      - name: Update Chart.yaml description
+        run: |
+          sed -i "s|description: Call all LLM APIs using the OpenAI format|description: Call all LLM APIs using the OpenAI format (Forked version)|g" deploy/charts/litellm-helm/Chart.yaml
+    
+      - name: Get LiteLLM Latest Tag
+        id: current_app_tag
+        shell: bash
+        run: |
+          LATEST_TAG=$(git describe --tags --exclude "*dev*" --abbrev=0)
+          if [ -z "${LATEST_TAG}" ]; then
+            echo "latest_tag=latest" | tee -a $GITHUB_OUTPUT
+          else
+            echo "latest_tag=${LATEST_TAG}" | tee -a $GITHUB_OUTPUT
+          fi
+
+      - name: Get last published chart version
+        id: current_version
+        shell: bash
+        run: |
+          CHART_LIST=$(helm show chart oci://${{ env.REGISTRY }}/${{ env.REPO_OWNER }}/${{ env.CHART_NAME }} 2>/dev/null || true)
+          if [ -z "${CHART_LIST}" ]; then
+            echo "current-version=0.1.0" | tee -a $GITHUB_OUTPUT
+          else
+            printf '%s' "${CHART_LIST}" | grep '^version:' | awk 'BEGIN{FS=":"}{print "current-version="$2}' | tr -d " " | tee -a $GITHUB_OUTPUT
+          fi
+        env:
+          HELM_EXPERIMENTAL_OCI: '1'
+
+      # Automatically update the helm chart version one "patch" level
+      - name: Bump release version
+        id: bump_version
+        uses: christian-draeger/increment-semantic-version@1.1.0
+        with:
+          current-version: ${{ steps.current_version.outputs.current-version || '0.1.0' }}
+          version-fragment: 'bug'
+
+      - uses: ./.github/actions/helm-oci-chart-releaser
+        with:
+          name: ${{ env.CHART_NAME }}
+          repository: ${{ env.REPO_OWNER }}
+          tag: ${{ github.event.inputs.chart_version || steps.bump_version.outputs.next-version || '0.1.0' }}
+          app_version: ${{ steps.current_app_tag.outputs.latest_tag }}
+          path: deploy/charts/${{ env.CHART_NAME }}
+          registry: ${{ env.REGISTRY }}
+          registry_username: ${{ github.actor }}
+          registry_password: ${{ secrets.GITHUB_TOKEN }}
+          update_dependencies: true 
